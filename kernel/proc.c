@@ -287,6 +287,7 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+  np->tracemask = p->tracemask;
   np->sz = p->sz;
 
   // copy saved user registers.
