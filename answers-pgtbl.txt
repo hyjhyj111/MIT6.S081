@@ -1,0 +1,31 @@
+Q1: Which other xv6 system call(s) could be made faster using this shared page? Explain how.
+
+uptime. It only returns a read-only value (the global tick count) that the kernel
+already maintains, and it does not need to modify process state or check complex
+arguments. The kernel can add a ticks field to struct usyscall and update it on
+each timer interrupt (or whenever ticks changes). User space can then read that
+field from the USYSCALL page without an ecall, the same way ugetpid reads pid.
+System calls that change kernel state or need permission checks (write, open,
+fork, sbrk, kill, etc.) are not good candidates for this optimization.
+
+Q2: Explain the output of vmprint in terms of Fig 3-4 from the text.
+
+The vmprint tree matches the process address space / multi-level page table in
+Fig 3-4: low virtual addresses appear under top-level entry 0, and high virtual
+addresses (near TRAMPOLINE) appear under top-level entry 255.
+
+page 0: The first leaf PTE under indices 0/0/0 has flags 0x1f (V|R|W|X|U). It is
+the lowest mapped user page of init after exec, typically the user text/code page.
+
+page 2: The leaf under 0/0/2 also has user RWX flags (0x1f). In the post-exec
+layout of init, this is typically the user stack page (or another low user data
+page; the stack is the usual answer for Fig 3-4-style layouts).
+
+page 1: The leaf under 0/0/1 has flags 0x0f (V|R|W|X) but no PTE_U. In user mode
+the process cannot read or write that memory; an access would page-fault. Only
+supervisor mode can use a mapping without PTE_U.
+
+third-to-last page: Among the three high-address leaves (509, 510, 511), the
+third-to-last is index 509 with flags 0x13 (V|R|U): user read-only. That is the
+USYSCALL shared page. The next-to-last (510, V|R|W, no U) is the trapframe, and
+the last (511, V|R|X, no U) is the trampoline.
